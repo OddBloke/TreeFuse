@@ -10,7 +10,10 @@ with open('README.rst') as readme_file:
 with open('HISTORY.rst') as history_file:
     history = history_file.read()
 
-requirements = [ ]
+requirements = [
+    "fuse-python",
+    "treelib",
+]
 
 test_requirements = ['pytest>=3', ]
 
