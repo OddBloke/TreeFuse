@@ -8,7 +8,7 @@ file content within the FUSE filesystem.
 import errno
 import os.path
 import stat
-from typing import Any, Iterator, Optional, Type, TypeVar, Union
+from typing import Any, Iterator, Optional, Tuple, Type, TypeVar, Union, cast
 
 import fuse
 import treelib
@@ -17,6 +17,7 @@ from fuse import Fuse
 fuse.fuse_python_api = (0, 2)
 
 _TFS = TypeVar("_TFS", bound="TreeFuseStat")
+NodeData = Tuple[Optional[bytes], Optional["TreeFuseStat"]]
 
 
 class TreeFuseStat(fuse.Stat):
@@ -149,16 +150,19 @@ class TreeFuseFS(Fuse):
     def _is_directory(self, node: treelib.Node) -> bool:
         return len(self._tree.children(node.identifier)) != 0
 
+    def _unpack_node_data(self, node: treelib.Node) -> NodeData:
+        if isinstance(node.data, tuple):
+            # We have a (content, stat) tuple
+            return cast(NodeData, node.data)
+        return node.data, None
+
     def getattr(self, path: str) -> Union[TreeFuseStat, int]:
         """Return a TreeFuseStat for the given `path` (or an error code)."""
         node = self._lookup_path(path)
         if node is None:
             return -errno.ENOENT
 
-        st = None
-        content = node.data
-        if isinstance(content, tuple):
-            content, st = content
+        content, st = self._unpack_node_data(node)
 
         if self._is_directory(node):
             if st is None:
@@ -166,7 +170,8 @@ class TreeFuseFS(Fuse):
         else:
             if st is None:
                 st = TreeFuseStat.for_file()
-            st.ensure_st_size_from(content)
+            if content is not None:
+                st.ensure_st_size_from(content)
         return st
 
     def open(self, path: str, flags: int) -> Optional[int]:
@@ -187,10 +192,7 @@ class TreeFuseFS(Fuse):
         if self._is_directory(node):
             return -errno.EISDIR
 
-        content = node.data
-        if isinstance(content, tuple):
-            # We have a (content, stat) tuple
-            content, _ = content
+        content, _ = self._unpack_node_data(node)
         if not isinstance(content, bytes):
             return -errno.EILSEQ
 
