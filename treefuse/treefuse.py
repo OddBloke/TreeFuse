@@ -29,8 +29,8 @@ class TreeFuseStat(fuse.Stat):
     There are three ways to construct a TreeFuseStat, ordered from most
     preferential:
 
-    * ``for_file`` is a consumer-friendly API, which exposes only common
-      parameters
+    * ``for_directory`` and ``for_file`` are a consumer-friendly APIs, which
+      expose only common parameters
     * ``for_directory_stat`` and ``for_file_stat`` are lower-level APIs, they
       take st_* prefixed parameters which are set directly in the stat data
       structure, with reasonable defaults for normal operation
@@ -38,6 +38,7 @@ class TreeFuseStat(fuse.Stat):
       without any defaulting
     """
 
+    _DEFAULT_DIRECTORY_MODE = 0o755
     _DEFAULT_FILE_MODE = 0o444
 
     # mypy can't infer self.st_size's type, so be explicit
@@ -51,16 +52,34 @@ class TreeFuseStat(fuse.Stat):
     @classmethod
     def for_directory_stat(
         cls: Type[_TFS],
-        st_mode: int = stat.S_IFDIR | 0o755,
+        st_mode: int = stat.S_IFDIR | _DEFAULT_DIRECTORY_MODE,
         st_nlink: int = 2,
         **kwargs: Any
     ) -> _TFS:
         """Low-level interface to construct a TreeFuseStat for a directory.
 
+        This lower-level API is used internally, and provided for consumers who
+        want to set stat struct values directly.
+
+        Setting these values incorrectly can lead to unexpected and difficult
+        to debug errors so, generally, the ``.for_directory`` constructor
+        should be preferred.
+
         Parameters are the same as the fields in ``os.stat_result``:
         https://docs.python.org/3/library/os.html#os.stat_result
         """
         return cls(st_mode=st_mode, st_nlink=st_nlink, **kwargs)
+
+    @classmethod
+    def for_directory(
+        cls: Type[_TFS], mode: int = _DEFAULT_DIRECTORY_MODE
+    ) -> _TFS:
+        """Construct a TreeFuseStat for a directory.
+
+        :param mode:
+            The mode to set on this directory (defaults to 0o755).
+        """
+        return cls.for_directory_stat(st_mode=stat.S_IFDIR | mode)
 
     @classmethod
     def for_file_stat(
@@ -136,13 +155,16 @@ class TreeFuseFS(Fuse):
         if node is None:
             return -errno.ENOENT
 
+        st = None
+        content = node.data
+        if isinstance(content, tuple):
+            content, st = content
+
         if self._is_directory(node):
-            st = TreeFuseStat.for_directory_stat()
+            if st is None:
+                st = TreeFuseStat.for_directory_stat()
         else:
-            content = node.data
-            if isinstance(content, tuple):
-                content, st = content
-            else:
+            if st is None:
                 st = TreeFuseStat.for_file()
             st.ensure_st_size_from(content)
         return st

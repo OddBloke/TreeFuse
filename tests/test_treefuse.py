@@ -155,3 +155,20 @@ def test_file_stat(mount_tree, tmp_path):
     rootchild = tmp_path.joinpath("rootchild")
     assert rootchild.read_text() == "rootchild content"
     assert stat.S_IMODE(rootchild.stat().st_mode) == 0o755
+
+
+def test_directory_stat(mount_tree, tmp_path):
+    """Test that we can change the mode of a directory."""
+    tree = treelib.Tree()
+    root = tree.create_node("root")
+    dir1 = tree.create_node(
+        "dir1",
+        parent=root,
+        data=(None, TreeFuseStat.for_directory(mode=0o705)),
+    )
+    tree.create_node("dirchild", parent=dir1, data=b"dirchild content")
+
+    mount_tree(tree)
+
+    dir1_path = tmp_path.joinpath("dir1")
+    assert stat.S_IMODE(dir1_path.stat().st_mode) == 0o705
