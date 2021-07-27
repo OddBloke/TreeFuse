@@ -82,8 +82,6 @@ def mount_tree(tmp_path):
                 if os.environ.get("TRAVIS") is not None:
                     # XXX: We see failures umount'ing without sudo on Travis
                     cmd.insert(0, "sudo")
-                else:
-                    print(os.environ)
                 subprocess.check_call(cmd)
             process.join()
         else:
