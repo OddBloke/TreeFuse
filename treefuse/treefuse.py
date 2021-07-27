@@ -95,11 +95,9 @@ class TreeFuseFS(Fuse):
         if node is None:
             return -errno.ENOENT
         if self._is_directory(node):
-            # XXX: Figure out correct return code here
-            return -errno.ENOENT
+            return -errno.EISDIR
         if not isinstance(node.data, bytes):
-            # XXX: Figure out correct return code here
-            return -errno.ENODATA
+            return -errno.EILSEQ
         content = node.data
         slen = len(content)
         if offset < slen:
@@ -119,9 +117,8 @@ class TreeFuseFS(Fuse):
             return -errno.ENOENT
         children = self._tree.children(dir_node.identifier)
         if not children:
-            # XXX: Figure out the appropriate return value for a non-dir
             # TODO: Support empty directories.
-            return -errno.ENOENT
+            return -errno.ENOTDIR
         dir_entries = [".", ".."]
         for child in children:
             dir_entries.append(child.tag)

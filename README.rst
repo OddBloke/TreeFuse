@@ -63,7 +63,7 @@ For 1.0
 
 For a first, minimal, feature complete release, we need:
 
-* All XXX comments have been addressed
+* **DONE**: All non-testing XXX comments have been addressed
 * Library consumers can provide ``stat`` values for files and directories
 * Usable documentation
 
