@@ -133,6 +133,8 @@ def test_basic_tree(mount_tree, tmp_path):
 
     mount_tree(tree)
 
+    assert tmp_path.is_dir()
+    assert tmp_path.joinpath("dir1").is_dir()
     assert tmp_path.joinpath("rootchild").read_text() == "rootchild content"
     assert (
         tmp_path.joinpath("dir1", "dirchild").read_text() == "dirchild content"
