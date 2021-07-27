@@ -106,6 +106,16 @@ def test_rootonly_tree(mount_tree):
     # to it; see TODOs in module docstring.
 
 
+def test_single_file_tree(mount_tree, tmp_path):
+    tree = treelib.Tree()
+    root = tree.create_node("root")
+    tree.create_node("rootchild", parent=root, data=b"rootchild content")
+
+    mount_tree(tree)
+
+    assert tmp_path.joinpath("rootchild").read_text() == "rootchild content"
+
+
 def test_basic_tree(mount_tree, tmp_path):
     """Test we can mount a basic tree structure."""
     tree = treelib.Tree()
