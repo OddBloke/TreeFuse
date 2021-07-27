@@ -132,6 +132,8 @@ class TreeFuseFS(Fuse):
 def treefuse_main(tree: treelib.Tree) -> None:
     if tree.root is None:
         raise Exception("Cannot handle empty Tree objects")
+    if len(tree) < 2:
+        raise Exception("No support for empty directories, even /")
     usage = (
         """
 Userspace hello example
