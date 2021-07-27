@@ -48,7 +48,9 @@ class TreeFuseFS(Fuse):
         current_node = self._tree.get_node(self._tree.root)
         while lookups:
             next_segment = lookups.pop(0)
-            for child_node_id in current_node.successors(self._tree.identifier):
+            for child_node_id in current_node.successors(
+                self._tree.identifier
+            ):
                 child_node = self._tree.get_node(child_node_id)
                 if child_node.tag == next_segment:
                     current_node = child_node
@@ -107,7 +109,9 @@ class TreeFuseFS(Fuse):
             buf = b""
         return buf
 
-    def readdir(self, path: str, offset: int) -> Union[Iterator[fuse.Direntry], int]:
+    def readdir(
+        self, path: str, offset: int
+    ) -> Union[Iterator[fuse.Direntry], int]:
         """Return `fuse.Direntry`s for the directory at `path`."""
         dir_node = self._lookup_path(path)
         if dir_node is None:
