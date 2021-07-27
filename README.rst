@@ -13,20 +13,46 @@ TreeFuse
         :target: https://treefuse.readthedocs.io/en/latest/?version=latest
         :alt: Documentation Status
 
+TreeFuse is a library for building FUSE filesystem CLIs from treelib Tree
+objects.
 
+It wraps python-fuse to provide a CLI entrypoint (`treefuse_main`) which takes
+a `tree` parameter and uses that to construct a directory tree and generate
+file content within the FUSE filesystem.
 
+Example Program
+---------------
 
-TreeFuse creates a FUSE filesystem from a treelib.Tree
+Executing this program::
+
+    tree = treelib.Tree()
+    root = tree.create_node("root")
+    dir1 = tree.create_node("dir1", parent=root)
+    tree.create_node("dirchild", parent=dir1, data=b"dirchild content\n")
+    tree.create_node("rootchild", parent=root, data=b"rootchild content\n")
+
+    fuse_main(tree)
+
+With a target directory (e.g. ``python3 example.py mnt``) will mount a
+filesystem matching the given tree::
+
+    $ tree mnt
+    mnt
+    ├── dir1
+    │   └── dirchild
+    └── rootchild
+
+    1 directory, 2 files
+
+    $ cat mnt/rootchild
+    rootchild content
+
+    $ cat mnt/dir1/dirchild
+    dirchild content
 
 
 * Free software: GNU General Public License v3
 * Documentation: https://treefuse.readthedocs.io.
-
-
-Features
---------
-
-* TODO
 
 Credits
 -------

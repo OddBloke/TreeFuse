@@ -1,6 +1,14 @@
+"""
+TreeFuse is a library for writing FUSE filesystems backed by treelib trees.
+
+It wraps python-fuse to provide a CLI entrypoint (`treefuse_main`) which takes
+a `tree` parameter and uses that to construct a directory tree and generate
+file content within the FUSE filesystem.
+"""
 import errno
 import os.path
 import stat
+from typing import Optional
 
 import fuse
 import treelib
@@ -24,11 +32,15 @@ class TreeFuseStat(fuse.Stat):
 
 
 class TreeFuseFS(Fuse):
+    """Implementation of a FUSE filesystem based on a treelib.Tree instance."""
     def __init__(self, *args, tree, **kwargs):
         self._tree = tree
         super().__init__(*args, **kwargs)
 
-    def _lookup_path(self, path: str) -> treelib.Node:
+    def _lookup_path(self, path: str) -> Optional[treelib.Node]:
+        """Find the node in self._tree corresponding to the given `path`.
+
+        Returns None if the path isn't present."""
         path = path.lstrip(os.path.sep)
         lookups = path.split(os.path.sep) if path else []
 
@@ -44,7 +56,8 @@ class TreeFuseFS(Fuse):
                 return None
         return current_node
 
-    def getattr(self, path):
+    def getattr(self, path: str):
+        """Return a TreeFuseStat for the given `path` (or an error code)."""
         node = self._lookup_path(path)
         if node is None:
             return -errno.ENOENT
@@ -63,6 +76,7 @@ class TreeFuseFS(Fuse):
         return st
 
     def open(self, path, flags):
+        """Perform permission checking for the given `path` and `flags`."""
         node = self._lookup_path(path)
         if node is None:
             return -errno.ENOENT
@@ -71,6 +85,7 @@ class TreeFuseFS(Fuse):
             return -errno.EACCES
 
     def read(self, path, size, offset):
+        """Read `size` bytes from `path`, starting at `offset`."""
         node = self._lookup_path(path)
         if node is None:
             return -errno.ENOENT
@@ -89,6 +104,7 @@ class TreeFuseFS(Fuse):
         return buf
 
     def readdir(self, path, offset):
+        """Return `fuse.Direntry`s for the directory at `path`."""
         dir_node = self._lookup_path(path)
         if dir_node is None:
             return -errno.ENOENT
