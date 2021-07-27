@@ -54,6 +54,26 @@ filesystem matching the given tree::
 * Free software: GNU General Public License v3
 * Documentation: https://treefuse.readthedocs.io.
 
+Roadmap
+-------
+
+For 1.0
+~~~~~~~
+
+For a first, minimal, feature complete release, we need:
+
+* All XXX comments have been addressed
+* Library consumers can provide ``stat`` values for files and directories
+* Usable documentation
+
+Beyond
+~~~~~~
+
+* Abstract the interface so that sources other than ``treelib`` can be
+  implemented
+* Provide a mechanism for library consumers to populate filesystem contents
+  asynchronously
+
 Credits
 -------
 
