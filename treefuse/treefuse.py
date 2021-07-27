@@ -8,7 +8,7 @@ file content within the FUSE filesystem.
 import errno
 import os.path
 import stat
-from typing import Optional
+from typing import Any, Iterator, Optional, Union
 
 import fuse
 import treelib
@@ -33,7 +33,8 @@ class TreeFuseStat(fuse.Stat):
 
 class TreeFuseFS(Fuse):
     """Implementation of a FUSE filesystem based on a treelib.Tree instance."""
-    def __init__(self, *args, tree, **kwargs):
+
+    def __init__(self, *args: Any, tree: treelib.Tree, **kwargs: Any):
         self._tree = tree
         super().__init__(*args, **kwargs)
 
@@ -56,7 +57,7 @@ class TreeFuseFS(Fuse):
                 return None
         return current_node
 
-    def getattr(self, path: str):
+    def getattr(self, path: str) -> Union[TreeFuseStat, int]:
         """Return a TreeFuseStat for the given `path` (or an error code)."""
         node = self._lookup_path(path)
         if node is None:
@@ -75,7 +76,7 @@ class TreeFuseFS(Fuse):
             st.st_size = len(content)
         return st
 
-    def open(self, path, flags):
+    def open(self, path: str, flags: int) -> Optional[int]:
         """Perform permission checking for the given `path` and `flags`."""
         node = self._lookup_path(path)
         if node is None:
@@ -83,8 +84,9 @@ class TreeFuseFS(Fuse):
         accmode = os.O_RDONLY | os.O_WRONLY | os.O_RDWR
         if (flags & accmode) != os.O_RDONLY:
             return -errno.EACCES
+        return None
 
-    def read(self, path, size, offset):
+    def read(self, path: str, size: int, offset: int) -> Union[int, bytes]:
         """Read `size` bytes from `path`, starting at `offset`."""
         node = self._lookup_path(path)
         if node is None:
@@ -93,6 +95,8 @@ class TreeFuseFS(Fuse):
             # This is a directory.
             # XXX: Figure out correct return code here
             return -errno.ENOENT
+        if not isinstance(node.data, bytes):
+            return -errno.ENODATA
         content = node.data
         slen = len(content)
         if offset < slen:
@@ -103,7 +107,7 @@ class TreeFuseFS(Fuse):
             buf = b""
         return buf
 
-    def readdir(self, path, offset):
+    def readdir(self, path: str, offset: int) -> Union[Iterator[fuse.Direntry], int]:
         """Return `fuse.Direntry`s for the directory at `path`."""
         dir_node = self._lookup_path(path)
         if dir_node is None:
@@ -120,7 +124,7 @@ class TreeFuseFS(Fuse):
             yield fuse.Direntry(entry)
 
 
-def treefuse_main(tree):
+def treefuse_main(tree: treelib.Tree) -> None:
     usage = (
         """
 Userspace hello example
