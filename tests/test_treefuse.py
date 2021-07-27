@@ -69,6 +69,16 @@ def mount_tree(tmp_path):
             )
 
 
+def test_empty_tree(mount_tree):
+    tree = treelib.Tree()
+
+    with pytest.raises(Exception):
+        mount_tree(tree)
+
+    # We should assert on the Exception content here, but we don't have access
+    # to it; see TODOs in module docstring.
+
+
 def test_basic_tree(mount_tree, tmp_path):
     """Test we can mount a basic tree structure."""
     tree = treelib.Tree()
