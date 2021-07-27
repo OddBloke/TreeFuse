@@ -64,7 +64,7 @@ For 1.0
 For a first, minimal, feature complete release, we need:
 
 * **DONE**: All non-testing XXX comments have been addressed
-* Library consumers can provide ``stat`` values for files and directories
+* **DONE**: Library consumers can provide ``stat`` values for files and directories
 * Usable documentation
 
 Beyond
