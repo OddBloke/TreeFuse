@@ -98,6 +98,7 @@ class TreeFuseFS(Fuse):
             # XXX: Figure out correct return code here
             return -errno.ENOENT
         if not isinstance(node.data, bytes):
+            # XXX: Figure out correct return code here
             return -errno.ENODATA
         content = node.data
         slen = len(content)
