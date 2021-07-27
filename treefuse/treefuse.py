@@ -18,7 +18,7 @@ fuse.fuse_python_api = (0, 2)
 
 
 class TreeFuseStat(fuse.Stat):
-    def __init__(self):
+    def __init__(self) -> None:
         self.st_mode = 0
         self.st_ino = 0
         self.st_dev = 0

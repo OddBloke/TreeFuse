@@ -49,6 +49,7 @@ clean-test: ## remove test and coverage artifacts
 
 lint: ## check style with flake8
 	flake8 treefuse tests
+	mypy --strict --allow-subclassing-any treefuse
 
 test: ## run tests quickly with the default Python
 	pytest
