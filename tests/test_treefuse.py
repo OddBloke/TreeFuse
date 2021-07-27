@@ -26,36 +26,42 @@ def mount_tree(tmp_path):
     consuming tests which request the `tmp_path` fixture.
     """
     process = None
+    skip_umount = False
 
     def _mounter(tree: treelib.Tree) -> None:
-        nonlocal process
+        nonlocal process, skip_umount
         # Run treefuse_main in a separate process so we can continue test
         # execution in this one
         process = multiprocessing.Process(target=treefuse_main, args=(tree,))
         with mock.patch("sys.argv", ["_test_", str(tmp_path)]):
             process.start()
         # As FUSE initialisation is happening in the background, we wait until
-        # it's mounted before returning control to the test code.
+        # it's mounted before returning control to the test code.  The FUSE
+        # process we execute is only alive while the mounting is happening;
+        # wait for it to exit, then check if the mount was successful.
         attempts = 100
         while attempts:
-            # all=True to include FUSE filesystems
-            partitions = psutil.disk_partitions(all=True)
-            if (
-                len([p for p in partitions if p.mountpoint == str(tmp_path)])
-                > 0
-            ):
+            if not process.is_alive():
                 # We're mounted!
                 break
             time.sleep(0.05)
             attempts -= 1
         else:
-            raise Exception("FUSE did not appear within 5s")
+            raise Exception("FUSE process did not exit within 5s")
+
+        # all=True to include FUSE filesystems
+        partitions = psutil.disk_partitions(all=True)
+        if not len([p for p in partitions if p.mountpoint == str(tmp_path)]):
+            process.join()
+            skip_umount = True
+            raise Exception("FUSE process exited, but mount did not occur")
 
     try:
         yield _mounter
     finally:
         if process is not None:
-            subprocess.check_call(["umount", str(tmp_path)])
+            if not skip_umount:
+                subprocess.check_call(["umount", str(tmp_path)])
             process.join()
         else:
             warnings.warn(
