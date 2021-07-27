@@ -1,6 +1,22 @@
 #!/usr/bin/env python
 
-"""Tests for `treefuse` package."""
+"""Tests for `treefuse` package.
+
+This file contains integration tests: the ``mount_tree`` fixture provides a
+callable which will mount a given Tree into a temporary directory, before
+passing control back to the requesting test.
+
+python-fuse causes the mounting process to exit, so we use a
+multiprocessing.Process to perform the mount itself.
+
+TODO:
+* Fully investigate how to stop python-fuse from exiting the test process, to
+  obviate the need for multiprocessing.  (I've already tried patching sys.exit
+  and catching SystemExit exceptions.)
+* Feed exceptions/stdout/stderr from the mounting Process back to the test
+  executing process, so tests (e.g. ``test_empty_tree``) can assert on mounting
+  failures with more granularity.
+"""
 
 import multiprocessing
 import subprocess
