@@ -31,7 +31,7 @@ Executing this program::
     tree.create_node("dirchild", parent=dir1, data=b"dirchild content\n")
     tree.create_node("rootchild", parent=root, data=b"rootchild content\n")
 
-    fuse_main(tree)
+    treefuse_main(tree)
 
 With a target directory (e.g. ``python3 example.py mnt``) will mount a
 filesystem matching the given tree::
