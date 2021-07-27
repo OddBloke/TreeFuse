@@ -18,6 +18,7 @@ TODO:
   failures with more granularity.
 """
 
+import os
 import multiprocessing
 import subprocess
 import time
@@ -77,7 +78,13 @@ def mount_tree(tmp_path):
     finally:
         if process is not None:
             if not skip_umount:
-                subprocess.check_call(["umount", str(tmp_path)])
+                cmd = ["umount", str(tmp_path)]
+                if os.environ.get("TRAVIS") is not None:
+                    # XXX: We see failures umount'ing without sudo on Travis
+                    cmd.insert(0, "sudo")
+                else:
+                    print(os.environ)
+                subprocess.check_call(cmd)
             process.join()
         else:
             warnings.warn(
