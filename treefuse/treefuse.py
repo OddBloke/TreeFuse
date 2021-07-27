@@ -8,7 +8,7 @@ file content within the FUSE filesystem.
 import errno
 import os.path
 import stat
-from typing import Any, Iterator, Optional, Union
+from typing import Any, Iterator, Optional, Type, TypeVar, Union
 
 import fuse
 import treelib
@@ -16,9 +16,29 @@ from fuse import Fuse
 
 fuse.fuse_python_api = (0, 2)
 
+_TFS = TypeVar("_TFS", bound="TreeFuseStat")
+
 
 class TreeFuseStat(fuse.Stat):
-    pass
+    @classmethod
+    def for_directory(
+        cls: Type[_TFS],
+        st_mode: int = stat.S_IFDIR | 0o755,
+        st_nlink: int = 2,
+        **kwargs: Any
+    ) -> _TFS:
+        """Get a TreeFuseStat with defaults for a directory."""
+        return cls(st_mode=st_mode, st_nlink=st_nlink, **kwargs)
+
+    @classmethod
+    def for_file(
+        cls: Type[_TFS],
+        st_mode: int = stat.S_IFREG | 0o444,
+        st_nlink: int = 1,
+        **kwargs: Any
+    ) -> _TFS:
+        """Get a TreeFuseStat with defaults for a file."""
+        return cls(st_mode=st_mode, st_nlink=st_nlink, **kwargs)
 
 
 class TreeFuseFS(Fuse):
@@ -59,12 +79,10 @@ class TreeFuseFS(Fuse):
             return -errno.ENOENT
 
         if self._is_directory(node):
-            st = TreeFuseStat(st_mode=stat.S_IFDIR | 0o755, st_nlink=2)
+            st = TreeFuseStat.for_directory()
         else:
             content = node.data
-            st = TreeFuseStat(
-                st_mode=stat.S_IFREG | 0o444, st_nlink=1, st_size=len(content)
-            )
+            st = TreeFuseStat.for_file(st_size=len(content))
         return st
 
     def open(self, path: str, flags: int) -> Optional[int]:
