@@ -104,7 +104,7 @@ class TreeFuseFS(Fuse):
         if offset < slen:
             if offset + size > slen:
                 size = slen - offset
-            buf = content[offset : offset + size]
+            buf = content[offset:offset + size]
         else:
             buf = b""
         return buf
@@ -118,7 +118,7 @@ class TreeFuseFS(Fuse):
             return -errno.ENOENT
         children = self._tree.children(dir_node.identifier)
         if not children:
-            # XXX: Figure out the appropriate return value for "readdir on a non-dir"
+            # XXX: Figure out the appropriate return value for a non-dir
             # TODO: Support empty directories.
             return -errno.ENOENT
         dir_entries = [".", ".."]

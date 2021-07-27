@@ -12,7 +12,7 @@ import psutil
 import pytest
 import treelib
 
-from treefuse import treefuse, treefuse_main
+from treefuse import treefuse_main
 
 
 @pytest.fixture
@@ -55,7 +55,9 @@ def mount_tree(tmpdir):
             subprocess.check_call(["umount", str(tmpdir)])
             process.join()
         else:
-            warnings.warn("mount_tree fixture is a noop if uncalled: remove it?")
+            warnings.warn(
+                "mount_tree fixture is a noop if uncalled: remove it?"
+            )
 
 
 def test_basic_tree(mount_tree, tmpdir):
