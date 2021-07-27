@@ -20,25 +20,83 @@ _TFS = TypeVar("_TFS", bound="TreeFuseStat")
 
 
 class TreeFuseStat(fuse.Stat):
+    """An object representing the stat struct for a TreeFuse node.
+
+    This is used both internally, passed into fuse-python's APIs, and as the
+    public interface for consumers to specify the stat struct which should
+    apply to a given node.
+
+    There are three ways to construct a TreeFuseStat, ordered from most
+    preferential:
+
+    * ``for_file`` is a consumer-friendly API, which exposes only common
+      parameters
+    * ``for_directory_stat`` and ``for_file_stat`` are lower-level APIs, they
+      take st_* prefixed parameters which are set directly in the stat data
+      structure, with reasonable defaults for normal operation
+    * ``__init__`` is effecitvely the same interface as ``for_*_stat``, but
+      without any defaulting
+    """
+
+    _DEFAULT_FILE_MODE = 0o444
+
+    # mypy can't infer self.st_size's type, so be explicit
+    st_size: Optional[int]
+
+    def ensure_st_size_from(self, content: bytes) -> None:
+        """If self.st_size is not yet set, use ``content`` to set it."""
+        if self.st_size is None:
+            self.st_size = len(content)
+
     @classmethod
-    def for_directory(
+    def for_directory_stat(
         cls: Type[_TFS],
         st_mode: int = stat.S_IFDIR | 0o755,
         st_nlink: int = 2,
         **kwargs: Any
     ) -> _TFS:
-        """Get a TreeFuseStat with defaults for a directory."""
+        """Low-level interface to construct a TreeFuseStat for a directory.
+
+        Parameters are the same as the fields in ``os.stat_result``:
+        https://docs.python.org/3/library/os.html#os.stat_result
+        """
         return cls(st_mode=st_mode, st_nlink=st_nlink, **kwargs)
 
     @classmethod
-    def for_file(
+    def for_file_stat(
         cls: Type[_TFS],
-        st_mode: int = stat.S_IFREG | 0o444,
+        st_mode: int = stat.S_IFREG | _DEFAULT_FILE_MODE,
         st_nlink: int = 1,
+        # st_size defaults to None so ensure_st_size_from can distinguish
+        # between consumers not passing a value and passing 0 (the fuse.Stat
+        # default)
+        st_size: Optional[int] = None,
         **kwargs: Any
     ) -> _TFS:
-        """Get a TreeFuseStat with defaults for a file."""
-        return cls(st_mode=st_mode, st_nlink=st_nlink, **kwargs)
+        """Low-level interface to construct a TreeFuseStat for a file.
+
+        This lower-level API is used internally, and provided for consumers who
+        want to set stat struct values directly.
+
+        Setting these values incorrectly can lead to unexpected and difficult
+        to debug errors so, generally, the ``.for_file`` constructor should be
+        preferred.
+
+        Parameters are the same as the fields in ``os.stat_result``:
+        https://docs.python.org/3/library/os.html#os.stat_result
+        """
+        return cls(
+            st_mode=st_mode, st_nlink=st_nlink, st_size=st_size, **kwargs
+        )
+
+    @classmethod
+    def for_file(cls: Type[_TFS], mode: int = _DEFAULT_FILE_MODE) -> _TFS:
+        """Construct a TreeFuseStat for a file.
+
+        :param mode:
+            The mode to set on this file (defaults to 0o444).
+        """
+        return cls.for_file_stat(st_mode=stat.S_IFREG | mode)
 
 
 class TreeFuseFS(Fuse):
@@ -79,10 +137,14 @@ class TreeFuseFS(Fuse):
             return -errno.ENOENT
 
         if self._is_directory(node):
-            st = TreeFuseStat.for_directory()
+            st = TreeFuseStat.for_directory_stat()
         else:
             content = node.data
-            st = TreeFuseStat.for_file(st_size=len(content))
+            if isinstance(content, tuple):
+                content, st = content
+            else:
+                st = TreeFuseStat.for_file()
+            st.ensure_st_size_from(content)
         return st
 
     def open(self, path: str, flags: int) -> Optional[int]:
@@ -102,9 +164,14 @@ class TreeFuseFS(Fuse):
             return -errno.ENOENT
         if self._is_directory(node):
             return -errno.EISDIR
-        if not isinstance(node.data, bytes):
-            return -errno.EILSEQ
+
         content = node.data
+        if isinstance(content, tuple):
+            # We have a (content, stat) tuple
+            content, _ = content
+        if not isinstance(content, bytes):
+            return -errno.EILSEQ
+
         slen = len(content)
         if offset < slen:
             if offset + size > slen:

@@ -18,8 +18,9 @@ TODO:
   failures with more granularity.
 """
 
-import os
 import multiprocessing
+import os
+import stat
 import subprocess
 import time
 import warnings
@@ -29,7 +30,7 @@ import psutil
 import pytest
 import treelib
 
-from treefuse import treefuse_main
+from treefuse import TreeFuseStat, treefuse_main
 
 
 @pytest.fixture
@@ -137,3 +138,20 @@ def test_basic_tree(mount_tree, tmp_path):
     assert (
         tmp_path.joinpath("dir1", "dirchild").read_text() == "dirchild content"
     )
+
+
+def test_file_stat(mount_tree, tmp_path):
+    """Test that we can change the mode of a file."""
+    tree = treelib.Tree()
+    root = tree.create_node("root")
+    tree.create_node(
+        "rootchild",
+        parent=root,
+        data=(b"rootchild content", TreeFuseStat.for_file(mode=0o755)),
+    )
+
+    mount_tree(tree)
+
+    rootchild = tmp_path.joinpath("rootchild")
+    assert rootchild.read_text() == "rootchild content"
+    assert stat.S_IMODE(rootchild.stat().st_mode) == 0o755
