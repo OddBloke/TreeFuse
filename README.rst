@@ -6,8 +6,9 @@ TreeFuse
 .. image:: https://img.shields.io/pypi/v/treefuse.svg
         :target: https://pypi.python.org/pypi/treefuse
 
-.. image:: https://img.shields.io/travis/OddBloke/treefuse.svg
+.. image:: https://img.shields.io/travis/com/OddBloke/TreeFuse
         :target: https://travis-ci.com/OddBloke/treefuse
+        :alt: Travis (.com)
 
 .. image:: https://readthedocs.org/projects/treefuse/badge/?version=latest
         :target: https://treefuse.readthedocs.io/en/latest/?version=latest
