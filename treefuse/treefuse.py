@@ -59,6 +59,9 @@ class TreeFuseFS(Fuse):
                 return None
         return current_node
 
+    def _is_directory(self, node: treelib.Node) -> bool:
+        return len(self._tree.children(node.identifier)) != 0
+
     def getattr(self, path: str) -> Union[TreeFuseStat, int]:
         """Return a TreeFuseStat for the given `path` (or an error code)."""
         node = self._lookup_path(path)
@@ -66,12 +69,10 @@ class TreeFuseFS(Fuse):
             return -errno.ENOENT
 
         st = TreeFuseStat()
-        if self._tree.children(node.identifier):
-            # This is a directory
+        if self._is_directory(node):
             st.st_mode = stat.S_IFDIR | 0o755
             st.st_nlink = 2
         else:
-            # This is a node
             content = node.data
             st.st_mode = stat.S_IFREG | 0o444
             st.st_nlink = 1
@@ -93,8 +94,7 @@ class TreeFuseFS(Fuse):
         node = self._lookup_path(path)
         if node is None:
             return -errno.ENOENT
-        if self._tree.children(node.identifier):
-            # This is a directory.
+        if self._is_directory(node):
             # XXX: Figure out correct return code here
             return -errno.ENOENT
         if not isinstance(node.data, bytes):
