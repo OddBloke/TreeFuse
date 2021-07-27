@@ -18,17 +18,7 @@ fuse.fuse_python_api = (0, 2)
 
 
 class TreeFuseStat(fuse.Stat):
-    def __init__(self) -> None:
-        self.st_mode = 0
-        self.st_ino = 0
-        self.st_dev = 0
-        self.st_nlink = 0
-        self.st_uid = 0
-        self.st_gid = 0
-        self.st_size = 0
-        self.st_atime = 0
-        self.st_mtime = 0
-        self.st_ctime = 0
+    pass
 
 
 class TreeFuseFS(Fuse):
@@ -68,15 +58,13 @@ class TreeFuseFS(Fuse):
         if node is None:
             return -errno.ENOENT
 
-        st = TreeFuseStat()
         if self._is_directory(node):
-            st.st_mode = stat.S_IFDIR | 0o755
-            st.st_nlink = 2
+            st = TreeFuseStat(st_mode=stat.S_IFDIR | 0o755, st_nlink=2)
         else:
             content = node.data
-            st.st_mode = stat.S_IFREG | 0o444
-            st.st_nlink = 1
-            st.st_size = len(content)
+            st = TreeFuseStat(
+                st_mode=stat.S_IFREG | 0o444, st_nlink=1, st_size=len(content)
+            )
         return st
 
     def open(self, path: str, flags: int) -> Optional[int]:
