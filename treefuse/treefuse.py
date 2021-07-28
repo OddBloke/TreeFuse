@@ -153,7 +153,12 @@ class TreelibProvider:
         for treelib_child_node in self._tree.children(
             self._node_mapping[node]
         ):
-            children.append(reverse_mapping[treelib_child_node.identifier])
+            try:
+                children.append(reverse_mapping[treelib_child_node.identifier])
+            except KeyError:
+                children.append(
+                    self._treelib_node_to_treefusenode(treelib_child_node)
+                )
         return children
 
     def is_directory(self, node: TreeFuseNode) -> bool:
@@ -179,15 +184,18 @@ class TreelibProvider:
                     break
             else:
                 return None
-        treefuse_node = self._unpack_node_data(current_node)
-        self._node_mapping[treefuse_node] = current_node.identifier
-        return treefuse_node
+        return self._treelib_node_to_treefusenode(current_node)
 
-    def _unpack_node_data(self, node: treelib.Node) -> TreeFuseNode:
+    def _treelib_node_to_treefusenode(
+        self, node: treelib.Node
+    ) -> TreeFuseNode:
         if isinstance(node.data, tuple):
             # We have a (content, stat) tuple.
-            return TreeFuseNode(node.tag, *node.data)
-        return TreeFuseNode(node.tag, node.data)
+            treefuse_node = TreeFuseNode(node.tag, *node.data)
+        else:
+            treefuse_node = TreeFuseNode(node.tag, node.data)
+        self._node_mapping[treefuse_node] = node.identifier
+        return treefuse_node
 
 
 class TreeFuseFS(Fuse):
