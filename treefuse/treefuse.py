@@ -283,6 +283,23 @@ class TreeFuseFS(Fuse):
             yield fuse.Direntry(entry)
 
 
+def _treefuse_main(provider: TreeFuseProvider) -> None:
+    # XXX: docs
+    usage = (
+        f"Mount a {sys.argv[0]} filesystem (powered by TreeFuse)\n"
+        + Fuse.fusage
+    )
+    server = TreeFuseFS(
+        version="%prog " + fuse.__version__,
+        usage=usage,
+        dash_s_do="setsingle",
+        provider=provider,
+    )
+
+    server.parse(errex=1)
+    server.main()
+
+
 def treefuse_main(tree: treelib.Tree) -> None:
     """Parse command-line options to mount a FUSE filesystem for ``tree``.
 
@@ -325,17 +342,5 @@ def treefuse_main(tree: treelib.Tree) -> None:
         raise Exception("Cannot handle empty Tree objects")
     if len(tree) < 2:
         raise Exception("No support for empty directories, even /")
-    usage = (
-        f"Mount a {sys.argv[0]} filesystem (powered by TreeFuse)\n"
-        + Fuse.fusage
-    )
     provider = TreelibProvider(tree)
-    server = TreeFuseFS(
-        version="%prog " + fuse.__version__,
-        usage=usage,
-        dash_s_do="setsingle",
-        provider=provider,
-    )
-
-    server.parse(errex=1)
-    server.main()
+    _treefuse_main(provider)
