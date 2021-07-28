@@ -155,7 +155,8 @@ class TreeFuseFS(Fuse):
 
     def _unpack_node_data(self, node: treelib.Node) -> NodeData:
         if isinstance(node.data, tuple):
-            # We have a (content, stat) tuple
+            # We have a (content, stat) tuple.  This cast is not strictly true,
+            # as element 0 might be None, but we address that before return.
             data = cast(NodeData, node.data)
         else:
             data = (node.data, None)
