@@ -122,14 +122,15 @@ class TreeFuseStat(fuse.Stat):
         return cls.for_file_stat(st_mode=stat.S_IFREG | mode)
 
 
-class TreeFuseFS(Fuse):
-    """Implementation of a FUSE filesystem based on a treelib.Tree instance."""
+class TreelibProvider:
 
-    def __init__(self, *args: Any, tree: treelib.Tree, **kwargs: Any):
+    def __init__(self, tree: treelib.Tree):
         self._tree = tree
-        super().__init__(*args, **kwargs)
 
-    def _lookup_path(self, path: str) -> Optional[treelib.Node]:
+    def is_directory(self, node: treelib.Node) -> bool:
+        return len(self._tree.children(node.identifier)) != 0
+
+    def lookup_path(self, path: str) -> Optional[treelib.Node]:
         """Find the node in self._tree corresponding to the given `path`.
 
         Returns None if the path isn't present."""
@@ -150,9 +151,6 @@ class TreeFuseFS(Fuse):
                 return None
         return current_node
 
-    def _is_directory(self, node: treelib.Node) -> bool:
-        return len(self._tree.children(node.identifier)) != 0
-
     def _unpack_node_data(self, node: treelib.Node) -> NodeData:
         if isinstance(node.data, tuple):
             # We have a (content, stat) tuple.  This cast is not strictly true,
@@ -164,15 +162,23 @@ class TreeFuseFS(Fuse):
             data = (b"", data[1])
         return data
 
+
+class TreeFuseFS(Fuse):
+    """Implementation of a FUSE filesystem based on a treelib.Tree instance."""
+
+    def __init__(self, *args: Any, provider: TreeFuseProvider, **kwargs: Any):
+        self._provider = provider
+        super().__init__(*args, **kwargs)
+
     def getattr(self, path: str) -> Union[TreeFuseStat, int]:
         """Return a TreeFuseStat for the given `path` (or an error code)."""
-        node = self._lookup_path(path)
+        node = self._provider.lookup_path(path)
         if node is None:
             return -errno.ENOENT
 
-        content, st = self._unpack_node_data(node)
+        content, st = self._provider._unpack_node_data(node)
 
-        if self._is_directory(node):
+        if self._provider.is_directory(node):
             if st is None:
                 st = TreeFuseStat.for_directory_stat()
         else:
@@ -183,7 +189,7 @@ class TreeFuseFS(Fuse):
 
     def open(self, path: str, flags: int) -> Optional[int]:
         """Perform permission checking for the given `path` and `flags`."""
-        node = self._lookup_path(path)
+        node = self._provider.lookup_path(path)
         if node is None:
             return -errno.ENOENT
         accmode = os.O_RDONLY | os.O_WRONLY | os.O_RDWR
@@ -193,13 +199,13 @@ class TreeFuseFS(Fuse):
 
     def read(self, path: str, size: int, offset: int) -> Union[int, bytes]:
         """Read `size` bytes from `path`, starting at `offset`."""
-        node = self._lookup_path(path)
+        node = self._provider.lookup_path(path)
         if node is None:
             return -errno.ENOENT
-        if self._is_directory(node):
+        if self._provider.is_directory(node):
             return -errno.EISDIR
 
-        content, _ = self._unpack_node_data(node)
+        content, _ = self._provider._unpack_node_data(node)
         if not isinstance(content, bytes):
             return -errno.EILSEQ
 
@@ -216,10 +222,10 @@ class TreeFuseFS(Fuse):
         self, path: str, offset: int
     ) -> Union[Iterator[fuse.Direntry], int]:
         """Return `fuse.Direntry`s for the directory at `path`."""
-        dir_node = self._lookup_path(path)
+        dir_node = self._provider.lookup_path(path)
         if dir_node is None:
             return -errno.ENOENT
-        children = self._tree.children(dir_node.identifier)
+        children = self._provider._tree.children(dir_node.identifier)
         if not children:
             # TODO: Support empty directories.
             return -errno.ENOTDIR
@@ -276,11 +282,12 @@ def treefuse_main(tree: treelib.Tree) -> None:
         f"Mount a {sys.argv[0]} filesystem (powered by TreeFuse)\n"
         + Fuse.fusage
     )
+    provider = TreelibProvider(tree)
     server = TreeFuseFS(
         version="%prog " + fuse.__version__,
         usage=usage,
         dash_s_do="setsingle",
-        tree=tree,
+        provider=provider,
     )
 
     server.parse(errex=1)
