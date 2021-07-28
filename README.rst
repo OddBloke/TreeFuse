@@ -66,18 +66,6 @@ See :ref:`examples` for more examples.
 Roadmap
 -------
 
-For 1.0
-~~~~~~~
-
-For a first, minimal, feature complete release, we need:
-
-* **DONE**: All non-testing XXX comments have been addressed
-* **DONE**: Library consumers can provide ``stat`` values for files and directories
-* Usable documentation
-
-Beyond
-~~~~~~
-
 * Abstract the interface so that sources other than ``treelib`` can be
   implemented
 * Provide a mechanism for library consumers to populate filesystem contents
