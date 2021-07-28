@@ -10,7 +10,8 @@ import os.path
 import stat
 import sys
 from dataclasses import dataclass
-from typing import Any, Dict, Iterator, Optional, Type, TypeVar, Union
+from typing import (Any, Collection, Dict, Iterator, Optional, Type, TypeVar,
+                    Union)
 
 import fuse
 import treelib
@@ -124,6 +125,7 @@ class TreeFuseStat(fuse.Stat):
 
 @dataclass(frozen=True)
 class TreeFuseNode:
+    name: str
     _content: Optional[bytes]
     stat: Optional[TreeFuseStat] = None
 
@@ -143,6 +145,16 @@ class TreelibProvider:
         self._tree = tree
         # TreeFuseNode -> treelib node identifier
         self._node_mapping: Dict[TreeFuseNode, str] = {}
+
+    def children_for(self, node: TreeFuseNode) -> Collection[TreeFuseNode]:
+        children = []
+        # XXX
+        reverse_mapping = {v: k for k, v in self._node_mapping.items()}
+        for treelib_child_node in self._tree.children(
+            self._node_mapping[node]
+        ):
+            children.append(reverse_mapping[treelib_child_node.identifier])
+        return children
 
     def is_directory(self, node: TreeFuseNode) -> bool:
         treelib_node_identifier = self._node_mapping[node]
@@ -174,8 +186,8 @@ class TreelibProvider:
     def _unpack_node_data(self, node: treelib.Node) -> TreeFuseNode:
         if isinstance(node.data, tuple):
             # We have a (content, stat) tuple.
-            return TreeFuseNode(*node.data)
-        return TreeFuseNode(node.data)
+            return TreeFuseNode(node.tag, *node.data)
+        return TreeFuseNode(node.tag, node.data)
 
 
 class TreeFuseFS(Fuse):
@@ -241,16 +253,13 @@ class TreeFuseFS(Fuse):
         dir_node = self._provider.lookup_path(path)
         if dir_node is None:
             return -errno.ENOENT
-        # XXX
-        children = self._provider._tree.children(
-            self._provider._node_mapping[dir_node]
-        )
+        children = self._provider.children_for(dir_node)
         if not children:
             # TODO: Support empty directories.
             return -errno.ENOTDIR
         dir_entries = [".", ".."]
         for child in children:
-            dir_entries.append(child.tag)
+            dir_entries.append(child.name)
         for entry in dir_entries:
             yield fuse.Direntry(entry)
 
