@@ -30,12 +30,13 @@ class TreeFuseStat(fuse.Stat):
     There are three ways to construct a TreeFuseStat, ordered from most
     preferential:
 
-    * ``for_directory`` and ``for_file`` are a consumer-friendly APIs, which
-      expose only common parameters
-    * ``for_directory_stat`` and ``for_file_stat`` are lower-level APIs, they
-      take st_* prefixed parameters which are set directly in the stat data
-      structure, with reasonable defaults for normal operation
-    * ``__init__`` is effecitvely the same interface as ``for_*_stat``, but
+    * :py:meth:`for_directory` and :py:meth:`for_file` are a consumer-friendly
+      APIs, which expose only common parameters
+    * :py:meth:`for_directory_stat` and :py:meth:`for_file_stat` are
+      lower-level APIs, they take st_* prefixed parameters which are set
+      directly in the stat data structure, with reasonable defaults for normal
+      operation
+    * ``__init__`` is effectively the same interface as ``for_*_stat``, but
       without any defaulting
     """
 
@@ -46,7 +47,7 @@ class TreeFuseStat(fuse.Stat):
     st_size: Optional[int]
 
     def ensure_st_size_from(self, content: bytes) -> None:
-        """If self.st_size is not yet set, use ``content`` to set it."""
+        """If ``self.st_size`` is not yet set, use ``content`` to set it."""
         if self.st_size is None:
             self.st_size = len(content)
 
@@ -57,13 +58,13 @@ class TreeFuseStat(fuse.Stat):
         st_nlink: int = 2,
         **kwargs: Any
     ) -> _TFS:
-        """Low-level interface to construct a TreeFuseStat for a directory.
+        """Low-level interface to construct a ``TreeFuseStat`` for a directory.
 
         This lower-level API is used internally, and provided for consumers who
         want to set stat struct values directly.
 
         Setting these values incorrectly can lead to unexpected and difficult
-        to debug errors so, generally, the ``.for_directory`` constructor
+        to debug errors so, generally, the :py:meth:`for_directory` constructor
         should be preferred.
 
         Parameters are the same as the fields in ``os.stat_result``:
@@ -75,10 +76,10 @@ class TreeFuseStat(fuse.Stat):
     def for_directory(
         cls: Type[_TFS], mode: int = _DEFAULT_DIRECTORY_MODE
     ) -> _TFS:
-        """Construct a TreeFuseStat for a directory.
+        """Construct a :py:class:`TreeFuseStat` for a directory.
 
         :param mode:
-            The mode to set on this directory (defaults to 0o755).
+            The mode to set on this directory (defaults to ``0o755``).
         """
         return cls.for_directory_stat(st_mode=stat.S_IFDIR | mode)
 
@@ -93,14 +94,15 @@ class TreeFuseStat(fuse.Stat):
         st_size: Optional[int] = None,
         **kwargs: Any
     ) -> _TFS:
-        """Low-level interface to construct a TreeFuseStat for a file.
+        """
+        Low-level interface to construct a :py:class:`TreeFuseStat` for a file.
 
         This lower-level API is used internally, and provided for consumers who
         want to set stat struct values directly.
 
         Setting these values incorrectly can lead to unexpected and difficult
-        to debug errors so, generally, the ``.for_file`` constructor should be
-        preferred.
+        to debug errors so, generally, the :py:meth:`.for_file` constructor
+        should be preferred.
 
         Parameters are the same as the fields in ``os.stat_result``:
         https://docs.python.org/3/library/os.html#os.stat_result
@@ -111,7 +113,7 @@ class TreeFuseStat(fuse.Stat):
 
     @classmethod
     def for_file(cls: Type[_TFS], mode: int = _DEFAULT_FILE_MODE) -> _TFS:
-        """Construct a TreeFuseStat for a file.
+        """Construct a :py:class:`TreeFuseStat` for a file.
 
         :param mode:
             The mode to set on this file (defaults to 0o444).
