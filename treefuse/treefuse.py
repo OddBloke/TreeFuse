@@ -17,7 +17,7 @@ from fuse import Fuse
 fuse.fuse_python_api = (0, 2)
 
 _TFS = TypeVar("_TFS", bound="TreeFuseStat")
-NodeData = Tuple[Optional[bytes], Optional["TreeFuseStat"]]
+NodeData = Tuple[bytes, Optional["TreeFuseStat"]]
 
 
 class TreeFuseStat(fuse.Stat):
@@ -155,11 +155,12 @@ class TreeFuseFS(Fuse):
     def _unpack_node_data(self, node: treelib.Node) -> NodeData:
         if isinstance(node.data, tuple):
             # We have a (content, stat) tuple
-            return cast(NodeData, node.data)
-        content = node.data
-        if content is None:
-            content = b""
-        return content, None
+            data = cast(NodeData, node.data)
+        else:
+            data = (node.data, None)
+        if data[0] is None:
+            data = (b"", data[1])
+        return data
 
     def getattr(self, path: str) -> Union[TreeFuseStat, int]:
         """Return a TreeFuseStat for the given `path` (or an error code)."""

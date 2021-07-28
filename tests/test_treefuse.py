@@ -171,6 +171,22 @@ class TestValidTreesWithStat:
         assert rootchild.read_text() == "rootchild content"
         assert stat.S_IMODE(rootchild.stat().st_mode) == 0o755
 
+    def test_file_only_stat(self, mount_tree, tmp_path):
+        """Test that we can change the mode of a file."""
+        tree = treelib.Tree()
+        root = tree.create_node("root")
+        tree.create_node(
+            "rootchild",
+            parent=root,
+            data=(None, TreeFuseStat.for_file(mode=0o755)),
+        )
+
+        mount_tree(tree)
+
+        rootchild = tmp_path.joinpath("rootchild")
+        assert rootchild.read_text() == ""
+        assert stat.S_IMODE(rootchild.stat().st_mode) == 0o755
+
     def test_directory_stat(self, mount_tree, tmp_path):
         """Test that we can change the mode of a directory."""
         tree = treelib.Tree()
