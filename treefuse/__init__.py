@@ -9,7 +9,7 @@ nodes which need it.  (See their documentation for details.)
 
 __author__ = """Daniel Watkins"""
 __email__ = "daniel@daniel-watkins.co.uk"
-__version__ = "0.1.0"
+__version__ = "1.0.0"
 
 from .treefuse import TreeFuseStat, treefuse_main
 
