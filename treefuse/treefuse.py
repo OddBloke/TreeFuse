@@ -8,6 +8,7 @@ file content within the FUSE filesystem.
 import errno
 import os.path
 import stat
+import sys
 from typing import Any, Iterator, Optional, Tuple, Type, TypeVar, Union, cast
 
 import fuse
@@ -271,9 +272,7 @@ def treefuse_main(tree: treelib.Tree) -> None:
     if len(tree) < 2:
         raise Exception("No support for empty directories, even /")
     usage = (
-        """
-Userspace hello example
-"""
+        f"Mount a {sys.argv[0]} filesystem (powered by TreeFuse)\n"
         + Fuse.fusage
     )
     server = TreeFuseFS(
