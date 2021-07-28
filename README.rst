@@ -54,6 +54,7 @@ filesystem matching the given tree::
     $ cat mnt/dir1/dirchild
     dirchild content
 
+See :ref:`examples` for more examples.
 
 Roadmap
 -------

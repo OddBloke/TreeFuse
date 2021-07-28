@@ -259,7 +259,7 @@ def treefuse_main(tree: treelib.Tree) -> None:
         ``bytes``: users will receive EILSEQ when reading from a file with
         non-``bytes`` content.
 
-    See :doc:`/usage` for detailed examples.
+    See :ref:`examples` for detailed examples.
 
     ``treefuse_main`` wraps python-fuse's CLI handling, so the FUSE-specific
     command-line options available to users will depend on the version of
