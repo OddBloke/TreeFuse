@@ -91,94 +91,98 @@ def mount_tree(tmp_path):
             )
 
 
-def test_empty_tree(mount_tree):
-    tree = treelib.Tree()
+class TestInvalidTrees:
+    def test_empty_tree(self, mount_tree):
+        tree = treelib.Tree()
 
-    with pytest.raises(Exception):
+        with pytest.raises(Exception):
+            mount_tree(tree)
+
+        # We should assert on the Exception content here, but we don't have
+        # access to it; see TODOs in module docstring.
+
+    def test_rootonly_tree(self, mount_tree):
+        tree = treelib.Tree()
+        tree.create_node("root")
+
+        with pytest.raises(Exception):
+            mount_tree(tree)
+
+        # We should assert on the Exception content here, but we don't have
+        # access to it; see TODOs in module docstring.
+
+
+class TestValidTreesWithoutStat:
+    def test_single_file_tree(self, mount_tree, tmp_path):
+        tree = treelib.Tree()
+        root = tree.create_node("root")
+        tree.create_node("rootchild", parent=root, data=b"rootchild content")
+
         mount_tree(tree)
 
-    # We should assert on the Exception content here, but we don't have access
-    # to it; see TODOs in module docstring.
+        assert (
+            tmp_path.joinpath("rootchild").read_text() == "rootchild content"
+        )
 
+    def test_no_data_file_tree(self, mount_tree, tmp_path):
+        tree = treelib.Tree()
+        root = tree.create_node("root")
+        tree.create_node("rootchild", parent=root)
 
-def test_rootonly_tree(mount_tree):
-    tree = treelib.Tree()
-    tree.create_node("root")
-
-    with pytest.raises(Exception):
         mount_tree(tree)
 
-    # We should assert on the Exception content here, but we don't have access
-    # to it; see TODOs in module docstring.
+        assert tmp_path.joinpath("rootchild").read_text() == ""
+
+    def test_basic_tree(self, mount_tree, tmp_path):
+        """Test we can mount a basic tree structure."""
+        tree = treelib.Tree()
+        root = tree.create_node("root")
+        dir1 = tree.create_node("dir1", parent=root)
+        tree.create_node("dirchild", parent=dir1, data=b"dirchild content")
+        tree.create_node("rootchild", parent=root, data=b"rootchild content")
+
+        mount_tree(tree)
+
+        assert tmp_path.is_dir()
+        assert tmp_path.joinpath("dir1").is_dir()
+        assert (
+            tmp_path.joinpath("rootchild").read_text() == "rootchild content"
+        )
+        assert (
+            tmp_path.joinpath("dir1", "dirchild").read_text()
+            == "dirchild content"
+        )
 
 
-def test_single_file_tree(mount_tree, tmp_path):
-    tree = treelib.Tree()
-    root = tree.create_node("root")
-    tree.create_node("rootchild", parent=root, data=b"rootchild content")
+class TestValidTreesWithStat:
+    def test_file_stat(self, mount_tree, tmp_path):
+        """Test that we can change the mode of a file."""
+        tree = treelib.Tree()
+        root = tree.create_node("root")
+        tree.create_node(
+            "rootchild",
+            parent=root,
+            data=(b"rootchild content", TreeFuseStat.for_file(mode=0o755)),
+        )
 
-    mount_tree(tree)
+        mount_tree(tree)
 
-    assert tmp_path.joinpath("rootchild").read_text() == "rootchild content"
+        rootchild = tmp_path.joinpath("rootchild")
+        assert rootchild.read_text() == "rootchild content"
+        assert stat.S_IMODE(rootchild.stat().st_mode) == 0o755
 
+    def test_directory_stat(self, mount_tree, tmp_path):
+        """Test that we can change the mode of a directory."""
+        tree = treelib.Tree()
+        root = tree.create_node("root")
+        dir1 = tree.create_node(
+            "dir1",
+            parent=root,
+            data=(None, TreeFuseStat.for_directory(mode=0o705)),
+        )
+        tree.create_node("dirchild", parent=dir1, data=b"dirchild content")
 
-def test_no_data_file_tree(mount_tree, tmp_path):
-    tree = treelib.Tree()
-    root = tree.create_node("root")
-    tree.create_node("rootchild", parent=root)
+        mount_tree(tree)
 
-    mount_tree(tree)
-
-    assert tmp_path.joinpath("rootchild").read_text() == ""
-
-
-def test_basic_tree(mount_tree, tmp_path):
-    """Test we can mount a basic tree structure."""
-    tree = treelib.Tree()
-    root = tree.create_node("root")
-    dir1 = tree.create_node("dir1", parent=root)
-    tree.create_node("dirchild", parent=dir1, data=b"dirchild content")
-    tree.create_node("rootchild", parent=root, data=b"rootchild content")
-
-    mount_tree(tree)
-
-    assert tmp_path.is_dir()
-    assert tmp_path.joinpath("dir1").is_dir()
-    assert tmp_path.joinpath("rootchild").read_text() == "rootchild content"
-    assert (
-        tmp_path.joinpath("dir1", "dirchild").read_text() == "dirchild content"
-    )
-
-
-def test_file_stat(mount_tree, tmp_path):
-    """Test that we can change the mode of a file."""
-    tree = treelib.Tree()
-    root = tree.create_node("root")
-    tree.create_node(
-        "rootchild",
-        parent=root,
-        data=(b"rootchild content", TreeFuseStat.for_file(mode=0o755)),
-    )
-
-    mount_tree(tree)
-
-    rootchild = tmp_path.joinpath("rootchild")
-    assert rootchild.read_text() == "rootchild content"
-    assert stat.S_IMODE(rootchild.stat().st_mode) == 0o755
-
-
-def test_directory_stat(mount_tree, tmp_path):
-    """Test that we can change the mode of a directory."""
-    tree = treelib.Tree()
-    root = tree.create_node("root")
-    dir1 = tree.create_node(
-        "dir1",
-        parent=root,
-        data=(None, TreeFuseStat.for_directory(mode=0o705)),
-    )
-    tree.create_node("dirchild", parent=dir1, data=b"dirchild content")
-
-    mount_tree(tree)
-
-    dir1_path = tmp_path.joinpath("dir1")
-    assert stat.S_IMODE(dir1_path.stat().st_mode) == 0o705
+        dir1_path = tmp_path.joinpath("dir1")
+        assert stat.S_IMODE(dir1_path.stat().st_mode) == 0o705
