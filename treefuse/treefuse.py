@@ -9,6 +9,7 @@ import errno
 import os.path
 import stat
 import sys
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Collection, Iterator, Optional, Type, TypeVar, Union
 
@@ -139,7 +140,22 @@ class TreeFuseNode:
         return self._content if self._content else b""
 
 
-class TreelibProvider:
+class TreeFuseProvider(ABC):
+
+    @abstractmethod
+    def children_for(self, path: str) -> Collection[TreeFuseNode]:
+        pass
+
+    @abstractmethod
+    def is_directory(self, path: str) -> bool:
+        pass
+
+    @abstractmethod
+    def lookup_path(self, path: str) -> Optional[TreeFuseNode]:
+        pass
+
+
+class TreelibProvider(TreeFuseProvider):
     def __init__(self, tree: treelib.Tree):
         self._tree = tree
 
