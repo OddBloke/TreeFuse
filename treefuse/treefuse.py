@@ -9,7 +9,8 @@ import errno
 import os.path
 import stat
 import sys
-from typing import Any, Iterator, Optional, Tuple, Type, TypeVar, Union, cast
+from dataclasses import dataclass
+from typing import Any, Dict, Iterator, Optional, Type, TypeVar, Union
 
 import fuse
 import treelib
@@ -18,7 +19,6 @@ from fuse import Fuse
 fuse.fuse_python_api = (0, 2)
 
 _TFS = TypeVar("_TFS", bound="TreeFuseStat")
-NodeData = Tuple[bytes, Optional["TreeFuseStat"]]
 
 
 class TreeFuseStat(fuse.Stat):
@@ -122,15 +122,33 @@ class TreeFuseStat(fuse.Stat):
         return cls.for_file_stat(st_mode=stat.S_IFREG | mode)
 
 
-class TreelibProvider:
+@dataclass(frozen=True)
+class TreeFuseNode:
+    _content: Optional[bytes]
+    stat: Optional[TreeFuseStat] = None
 
+    @property
+    def content(self) -> bytes:
+        """Return self._content, or b"" if self._content is None.
+
+        We do this instead of defaulting on initialisation so that we aren't
+        throwing away provider input: 'this file has no data' and 'this file's
+        data is b""' are not identical inputs.
+        """
+        return self._content if self._content else b""
+
+
+class TreelibProvider:
     def __init__(self, tree: treelib.Tree):
         self._tree = tree
+        # TreeFuseNode -> treelib node identifier
+        self._node_mapping: Dict[TreeFuseNode, str] = {}
 
-    def is_directory(self, node: treelib.Node) -> bool:
-        return len(self._tree.children(node.identifier)) != 0
+    def is_directory(self, node: TreeFuseNode) -> bool:
+        treelib_node_identifier = self._node_mapping[node]
+        return len(self._tree.children(treelib_node_identifier)) != 0
 
-    def lookup_path(self, path: str) -> Optional[treelib.Node]:
+    def lookup_path(self, path: str) -> Optional[TreeFuseNode]:
         """Find the node in self._tree corresponding to the given `path`.
 
         Returns None if the path isn't present."""
@@ -149,18 +167,15 @@ class TreelibProvider:
                     break
             else:
                 return None
-        return current_node
+        treefuse_node = self._unpack_node_data(current_node)
+        self._node_mapping[treefuse_node] = current_node.identifier
+        return treefuse_node
 
-    def _unpack_node_data(self, node: treelib.Node) -> NodeData:
+    def _unpack_node_data(self, node: treelib.Node) -> TreeFuseNode:
         if isinstance(node.data, tuple):
-            # We have a (content, stat) tuple.  This cast is not strictly true,
-            # as element 0 might be None, but we address that before return.
-            data = cast(NodeData, node.data)
-        else:
-            data = (node.data, None)
-        if data[0] is None:
-            data = (b"", data[1])
-        return data
+            # We have a (content, stat) tuple.
+            return TreeFuseNode(*node.data)
+        return TreeFuseNode(node.data)
 
 
 class TreeFuseFS(Fuse):
@@ -176,7 +191,7 @@ class TreeFuseFS(Fuse):
         if node is None:
             return -errno.ENOENT
 
-        content, st = self._provider._unpack_node_data(node)
+        content, st = node.content, node.stat
 
         if self._provider.is_directory(node):
             if st is None:
@@ -189,6 +204,7 @@ class TreeFuseFS(Fuse):
 
     def open(self, path: str, flags: int) -> Optional[int]:
         """Perform permission checking for the given `path` and `flags`."""
+        # TODO: Distinguish between getting a node object, and checking for path existence
         node = self._provider.lookup_path(path)
         if node is None:
             return -errno.ENOENT
@@ -205,7 +221,7 @@ class TreeFuseFS(Fuse):
         if self._provider.is_directory(node):
             return -errno.EISDIR
 
-        content, _ = self._provider._unpack_node_data(node)
+        content = node.content
         if not isinstance(content, bytes):
             return -errno.EILSEQ
 
@@ -225,7 +241,10 @@ class TreeFuseFS(Fuse):
         dir_node = self._provider.lookup_path(path)
         if dir_node is None:
             return -errno.ENOENT
-        children = self._provider._tree.children(dir_node.identifier)
+        # XXX
+        children = self._provider._tree.children(
+            self._provider._node_mapping[dir_node]
+        )
         if not children:
             # TODO: Support empty directories.
             return -errno.ENOTDIR
