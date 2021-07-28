@@ -18,6 +18,7 @@ TODO:
   failures with more granularity.
 """
 
+import errno
 import multiprocessing
 import os
 import stat
@@ -202,3 +203,19 @@ class TestValidTreesWithStat:
 
         dir1_path = tmp_path.joinpath("dir1")
         assert stat.S_IMODE(dir1_path.stat().st_mode) == 0o705
+
+
+class TestValidTreesWithInvalidNodes:
+
+    def test_file_with_nonbytes_content(self, mount_tree, tmp_path):
+        tree = treelib.Tree()
+        root = tree.create_node("root")
+        tree.create_node("rootchild", parent=root, data="not bytes!")
+
+        mount_tree(tree)
+
+        with pytest.raises(OSError) as exc_info:
+            tmp_path.joinpath("rootchild").read_text()
+
+        exception = exc_info.value
+        assert errno.EILSEQ == exception.errno
