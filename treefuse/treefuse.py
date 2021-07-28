@@ -229,6 +229,43 @@ class TreeFuseFS(Fuse):
 
 
 def treefuse_main(tree: treelib.Tree) -> None:
+    """Parse command-line options to mount a FUSE filesystem for ``tree``.
+
+    The :py:class:`treelib.Tree` instance passed as ``tree`` is interpreted as
+    the directory structure that should be presented via FUSE, as follows:
+
+    * Any node without children is interpreted as a file
+        * Files have 444 permissions by default
+    * Any node with children is interpreted as a directory
+        * Directories have 755 permissions by default
+        * TreeFuse does not (yet) support empty directories
+        * Importantly, this includes the root directory: you must add at least
+          one child node (i.e. file) to the root node
+    * The ``.data`` attribute provided by :py:class:`treelib.Node`, if set,
+      will be read for metadata and content, in one of two ways:
+        * If a ``bytes`` instance is set as ``node.data``, it is used as the
+          content for file nodes; it is ignored for directory nodes.
+        * If a tuple of ``(bytes, TreeFuseStat)`` is set as ``node.data``:
+            * The first element is used as the content for file nodes; it is
+              ignored for directory nodes.
+            * The second element, a :py:class:`TreeFuseStat` instance (or
+              something that quacks like one), is used to set the ``stat``
+              values (e.g. permissions/mode, owner, group, etc.) on the node:
+              see its docs for details.
+
+    .. note::
+
+        In both forms of ``node.data``, file content *must* be specified as
+        ``bytes``: users will receive EILSEQ when reading from a file with
+        non-``bytes`` content.
+
+    See :doc:`/usage` for detailed examples.
+
+    ``treefuse_main`` wraps python-fuse's CLI handling, so the FUSE-specific
+    command-line options available to users will depend on the version of
+    python-fuse (published on PyPI as ``fuse-python``) which they have
+    installed.  See help output for full details.
+    """
     if tree.root is None:
         raise Exception("Cannot handle empty Tree objects")
     if len(tree) < 2:
