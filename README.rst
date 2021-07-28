@@ -61,7 +61,8 @@ filesystem matching the given tree::
     $ cat mnt/dir1/dirchild
     dirchild content
 
-See :ref:`examples` for more examples.
+See `Examples <https://treefuse.readthedocs.io/en/latest/usage.html#examples>`_
+for more examples.
 
 Roadmap
 -------

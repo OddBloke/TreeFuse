@@ -7,7 +7,7 @@ History
 
 * Add documentation.
 * Implement support for providing non-default stat values for nodes (via
-  :py:class:`treefuse.TreeFuseStat`).
+  ``treefuse.TreeFuseStat``).
 * Replace temporary ENOENT error returns with more appropriate codes.
 * Fix default usage string.
 
