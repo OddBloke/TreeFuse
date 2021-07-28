@@ -21,6 +21,9 @@ It wraps python-fuse to provide a CLI entrypoint (`treefuse_main`) which takes
 a `tree` parameter and uses that to construct a directory tree and generate
 file content within the FUSE filesystem.
 
+* Free software: GNU General Public License v3
+* Documentation: https://treefuse.readthedocs.io.
+
 Example Program
 ---------------
 
@@ -51,9 +54,6 @@ filesystem matching the given tree::
     $ cat mnt/dir1/dirchild
     dirchild content
 
-
-* Free software: GNU General Public License v3
-* Documentation: https://treefuse.readthedocs.io.
 
 Roadmap
 -------
