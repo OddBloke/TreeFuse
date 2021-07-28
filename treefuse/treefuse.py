@@ -10,8 +10,7 @@ import os.path
 import stat
 import sys
 from dataclasses import dataclass
-from typing import (Any, Collection, Dict, Iterator, Optional, Type, TypeVar,
-                    Union)
+from typing import Any, Collection, Iterator, Optional, Type, TypeVar, Union
 
 import fuse
 import treelib
@@ -143,32 +142,20 @@ class TreeFuseNode:
 class TreelibProvider:
     def __init__(self, tree: treelib.Tree):
         self._tree = tree
-        # TreeFuseNode -> treelib node identifier
-        self._node_mapping: Dict[TreeFuseNode, str] = {}
 
-    def children_for(self, node: TreeFuseNode) -> Collection[TreeFuseNode]:
+    def children_for(self, path: str) -> Collection[TreeFuseNode]:
+        node = self._lookup_path(path)
         children = []
-        # XXX
-        reverse_mapping = {v: k for k, v in self._node_mapping.items()}
-        for treelib_child_node in self._tree.children(
-            self._node_mapping[node]
-        ):
-            try:
-                children.append(reverse_mapping[treelib_child_node.identifier])
-            except KeyError:
-                children.append(
-                    self._treelib_node_to_treefusenode(treelib_child_node)
-                )
+        for treelib_child_node in self._tree.children(node.identifier):
+            children.append(
+                self._treelib_node_to_treefusenode(treelib_child_node)
+            )
         return children
 
-    def is_directory(self, node: TreeFuseNode) -> bool:
-        treelib_node_identifier = self._node_mapping[node]
-        return len(self._tree.children(treelib_node_identifier)) != 0
+    def is_directory(self, path: str) -> bool:
+        return len(self.children_for(path)) != 0
 
-    def lookup_path(self, path: str) -> Optional[TreeFuseNode]:
-        """Find the node in self._tree corresponding to the given `path`.
-
-        Returns None if the path isn't present."""
+    def _lookup_path(self, path: str) -> Optional[treelib.Node]:
         path = path.lstrip(os.path.sep)
         lookups = path.split(os.path.sep) if path else []
 
@@ -184,7 +171,16 @@ class TreelibProvider:
                     break
             else:
                 return None
-        return self._treelib_node_to_treefusenode(current_node)
+        return current_node
+
+    def lookup_path(self, path: str) -> Optional[TreeFuseNode]:
+        """Find the node in self._tree corresponding to the given `path`.
+
+        Returns None if the path isn't present."""
+        maybe_treelib_node = self._lookup_path(path)
+        if maybe_treelib_node is not None:
+            return self._treelib_node_to_treefusenode(maybe_treelib_node)
+        return None
 
     def _treelib_node_to_treefusenode(
         self, node: treelib.Node
@@ -194,7 +190,6 @@ class TreelibProvider:
             treefuse_node = TreeFuseNode(node.tag, *node.data)
         else:
             treefuse_node = TreeFuseNode(node.tag, node.data)
-        self._node_mapping[treefuse_node] = node.identifier
         return treefuse_node
 
 
@@ -213,7 +208,7 @@ class TreeFuseFS(Fuse):
 
         content, st = node.content, node.stat
 
-        if self._provider.is_directory(node):
+        if self._provider.is_directory(path):
             if st is None:
                 st = TreeFuseStat.for_directory_stat()
         else:
@@ -238,7 +233,7 @@ class TreeFuseFS(Fuse):
         node = self._provider.lookup_path(path)
         if node is None:
             return -errno.ENOENT
-        if self._provider.is_directory(node):
+        if self._provider.is_directory(path):
             return -errno.EISDIR
 
         content = node.content
@@ -261,7 +256,7 @@ class TreeFuseFS(Fuse):
         dir_node = self._provider.lookup_path(path)
         if dir_node is None:
             return -errno.ENOENT
-        children = self._provider.children_for(dir_node)
+        children = self._provider.children_for(path)
         if not children:
             # TODO: Support empty directories.
             return -errno.ENOTDIR
