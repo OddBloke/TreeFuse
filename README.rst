@@ -33,6 +33,9 @@ Example Program
 
 Executing this program::
 
+    import treelib
+    from treefuse import treefuse_main
+
     tree = treelib.Tree()
     root = tree.create_node("root")
     dir1 = tree.create_node("dir1", parent=root)
