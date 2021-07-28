@@ -154,7 +154,10 @@ class TreeFuseFS(Fuse):
         if isinstance(node.data, tuple):
             # We have a (content, stat) tuple
             return cast(NodeData, node.data)
-        return node.data, None
+        content = node.data
+        if content is None:
+            content = b""
+        return content, None
 
     def getattr(self, path: str) -> Union[TreeFuseStat, int]:
         """Return a TreeFuseStat for the given `path` (or an error code)."""
@@ -170,8 +173,7 @@ class TreeFuseFS(Fuse):
         else:
             if st is None:
                 st = TreeFuseStat.for_file()
-            if content is not None:
-                st.ensure_st_size_from(content)
+            st.ensure_st_size_from(content)
         return st
 
     def open(self, path: str, flags: int) -> Optional[int]:
