@@ -1,11 +1,16 @@
 Welcome to TreeFuse's documentation!
 ======================================
 
+.. include:: ../README.rst
+   :start-after: doc-index-include-start
+   :end-before: doc-index-include-end
+
+Contents
+--------
+
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
 
-   readme
    installation
    usage
    modules

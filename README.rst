@@ -14,6 +14,10 @@ TreeFuse
         :target: https://treefuse.readthedocs.io/en/latest/?version=latest
         :alt: Documentation Status
 
+.. doc-index-include-start
+.. ^ and the corresponding -end below are used to indicate the portion of the
+   README which is included in the documentation index
+
 TreeFuse is a library for building FUSE filesystem CLIs from treelib Tree
 objects.
 
@@ -85,3 +89,5 @@ This library was written during a hack week at my employer, DigitalOcean.
 
 .. _Cookiecutter: https://github.com/audreyr/cookiecutter
 .. _`audreyr/cookiecutter-pypackage`: https://github.com/audreyr/cookiecutter-pypackage
+
+.. doc-index-include-end
