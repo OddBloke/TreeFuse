@@ -9,7 +9,9 @@ import errno
 import os.path
 import stat
 import sys
-from typing import Any, Iterator, Optional, Tuple, Type, TypeVar, Union, cast
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import Any, Collection, Iterator, Optional, Type, TypeVar, Union
 
 import fuse
 import treelib
@@ -18,7 +20,6 @@ from fuse import Fuse
 fuse.fuse_python_api = (0, 2)
 
 _TFS = TypeVar("_TFS", bound="TreeFuseStat")
-NodeData = Tuple[bytes, Optional["TreeFuseStat"]]
 
 
 class TreeFuseStat(fuse.Stat):
@@ -122,17 +123,99 @@ class TreeFuseStat(fuse.Stat):
         return cls.for_file_stat(st_mode=stat.S_IFREG | mode)
 
 
-class TreeFuseFS(Fuse):
-    """Implementation of a FUSE filesystem based on a treelib.Tree instance."""
+@dataclass(frozen=True)
+class TreeFuseNode:
+    """An abstraction of a node in a TreeFuse filesystem.
 
-    def __init__(self, *args: Any, tree: treelib.Tree, **kwargs: Any):
+    :param name:
+        The name of the node in the filesystem (i.e. filename/directory name).
+    :param _content:
+        The content of the node in the filesystem, if any.  Files will default
+        to b"" as their content if ``None`` is specified.  (This can be passed
+        for directories, but won't be used by TreeFuse.)
+    :param stat:
+        The ``TreeFuseStat`` that should be used for this node: if not given,
+        TreeFuse will use a default (with ``TreeFuseProvider.is_directory``
+        determining whether to use the file or directory default).
+    """
+    name: str
+    _content: Optional[bytes]
+    stat: Optional[TreeFuseStat] = None
+
+    @property
+    def content(self) -> bytes:
+        """Return self._content, or b"" if self._content is None.
+
+        We do this instead of defaulting on initialisation so that we aren't
+        throwing away provider input: 'this file has no data' and 'this file's
+        data is b""' are not identical inputs.
+        """
+        return self._content if self._content else b""
+
+
+class TreeFuseProvider(ABC):
+    """Abstract base class for TreeFuse providers."""
+
+    @abstractmethod
+    def children_for(self, path: str) -> Collection[TreeFuseNode]:
+        """Return ``TreeFuseNode``s for each child of ``path``.
+
+        N.B. TreeFuse does not (yet) support empty directories, so returning an
+        empty ``Collection`` is used to indicate that ``path`` is a file.
+        """
+        pass
+
+    def is_directory(self, path: str) -> bool:
+        """Is ``path`` a directory?
+
+        This will only be called for paths for which ``lookup_path`` returns a
+        ``TreeFuseNode`` without a ``.stat`` set, to determine the appropriate
+        default to use.
+
+        A default implementation is provided, which checks that
+        ``self.children_for`` is not empty.
+        """
+        return bool(self.children_for(path))
+
+    @abstractmethod
+    def lookup_path(self, path: str) -> Optional[TreeFuseNode]:
+        """Return a ``TreeFuseNode`` corresponding to ``path``.
+
+        If the path is not present in the filesystem, return ``None``.
+        Otherwise return the ``TreeFuseNode`` corresponding to ``path``
+        """
+        pass
+
+
+class TreelibProvider(TreeFuseProvider):
+    """A ``TreeFuseProvider`` to wrap a ``treelib.Tree``.
+
+    :param tree:
+        The tree to use as the source of the FUSE filesystem.
+    """
+    def __init__(self, tree: treelib.Tree):
         self._tree = tree
-        super().__init__(*args, **kwargs)
+
+    def children_for(self, path: str) -> Collection[TreeFuseNode]:
+        """Return ``TreeFuseNode``\ s for each child of ``path``.
+
+        Specifically, we find the ``treelib.Node`` corresponding to ``path``,
+        and return a ``TreeFuseNode`` for each of its children in the tree.
+        """
+        node = self._lookup_path(path)
+        children = []
+        for treelib_child_node in self._tree.children(node.identifier):
+            children.append(
+                self._treelib_node_to_treefusenode(treelib_child_node)
+            )
+        return children
 
     def _lookup_path(self, path: str) -> Optional[treelib.Node]:
-        """Find the node in self._tree corresponding to the given `path`.
+        """Look up the given ``path`` in our ``treelib.Tree``.
 
-        Returns None if the path isn't present."""
+        This is the internal lookup function: it operates only in terms of
+        treelib objects.
+        """
         path = path.lstrip(os.path.sep)
         lookups = path.split(os.path.sep) if path else []
 
@@ -150,29 +233,47 @@ class TreeFuseFS(Fuse):
                 return None
         return current_node
 
-    def _is_directory(self, node: treelib.Node) -> bool:
-        return len(self._tree.children(node.identifier)) != 0
+    def lookup_path(self, path: str) -> Optional[TreeFuseNode]:
+        """Find the node in ``self._tree`` corresponding to the given ``path``.
 
-    def _unpack_node_data(self, node: treelib.Node) -> NodeData:
+        Returns None if the path isn't present."""
+        maybe_treelib_node = self._lookup_path(path)
+        if maybe_treelib_node is not None:
+            return self._treelib_node_to_treefusenode(maybe_treelib_node)
+        return None
+
+    def _treelib_node_to_treefusenode(
+        self, node: treelib.Node
+    ) -> TreeFuseNode:
+        """Construct a ``TreeFuseNode`` for the given ``treelib.Node``.
+
+        This consists of mapping ``node.data`` to ``TreeFuseNode.__init__``
+        parameters.
+        """
         if isinstance(node.data, tuple):
-            # We have a (content, stat) tuple.  This cast is not strictly true,
-            # as element 0 might be None, but we address that before return.
-            data = cast(NodeData, node.data)
+            # We have a (content, stat) tuple.
+            treefuse_node = TreeFuseNode(node.tag, *node.data)
         else:
-            data = (node.data, None)
-        if data[0] is None:
-            data = (b"", data[1])
-        return data
+            treefuse_node = TreeFuseNode(node.tag, node.data)
+        return treefuse_node
+
+
+class TreeFuseFS(Fuse):
+    """Implementation of a FUSE filesystem based on a treelib.Tree instance."""
+
+    def __init__(self, *args: Any, provider: TreeFuseProvider, **kwargs: Any):
+        self._provider = provider
+        super().__init__(*args, **kwargs)
 
     def getattr(self, path: str) -> Union[TreeFuseStat, int]:
         """Return a TreeFuseStat for the given `path` (or an error code)."""
-        node = self._lookup_path(path)
+        node = self._provider.lookup_path(path)
         if node is None:
             return -errno.ENOENT
 
-        content, st = self._unpack_node_data(node)
+        content, st = node.content, node.stat
 
-        if self._is_directory(node):
+        if self._provider.is_directory(path):
             if st is None:
                 st = TreeFuseStat.for_directory_stat()
         else:
@@ -183,7 +284,8 @@ class TreeFuseFS(Fuse):
 
     def open(self, path: str, flags: int) -> Optional[int]:
         """Perform permission checking for the given `path` and `flags`."""
-        node = self._lookup_path(path)
+        # TODO: Distinguish between getting a node object, and checking for path existence
+        node = self._provider.lookup_path(path)
         if node is None:
             return -errno.ENOENT
         accmode = os.O_RDONLY | os.O_WRONLY | os.O_RDWR
@@ -193,13 +295,13 @@ class TreeFuseFS(Fuse):
 
     def read(self, path: str, size: int, offset: int) -> Union[int, bytes]:
         """Read `size` bytes from `path`, starting at `offset`."""
-        node = self._lookup_path(path)
+        node = self._provider.lookup_path(path)
         if node is None:
             return -errno.ENOENT
-        if self._is_directory(node):
+        if self._provider.is_directory(path):
             return -errno.EISDIR
 
-        content, _ = self._unpack_node_data(node)
+        content = node.content
         if not isinstance(content, bytes):
             return -errno.EILSEQ
 
@@ -216,18 +318,35 @@ class TreeFuseFS(Fuse):
         self, path: str, offset: int
     ) -> Union[Iterator[fuse.Direntry], int]:
         """Return `fuse.Direntry`s for the directory at `path`."""
-        dir_node = self._lookup_path(path)
+        dir_node = self._provider.lookup_path(path)
         if dir_node is None:
             return -errno.ENOENT
-        children = self._tree.children(dir_node.identifier)
+        children = self._provider.children_for(path)
         if not children:
             # TODO: Support empty directories.
             return -errno.ENOTDIR
         dir_entries = [".", ".."]
         for child in children:
-            dir_entries.append(child.tag)
+            dir_entries.append(child.name)
         for entry in dir_entries:
             yield fuse.Direntry(entry)
+
+
+def _treefuse_main(provider: TreeFuseProvider) -> None:
+    # XXX: docs
+    usage = (
+        f"Mount a {sys.argv[0]} filesystem (powered by TreeFuse)\n"
+        + Fuse.fusage
+    )
+    server = TreeFuseFS(
+        version="%prog " + fuse.__version__,
+        usage=usage,
+        dash_s_do="setsingle",
+        provider=provider,
+    )
+
+    server.parse(errex=1)
+    server.main()
 
 
 def treefuse_main(tree: treelib.Tree) -> None:
@@ -272,16 +391,5 @@ def treefuse_main(tree: treelib.Tree) -> None:
         raise Exception("Cannot handle empty Tree objects")
     if len(tree) < 2:
         raise Exception("No support for empty directories, even /")
-    usage = (
-        f"Mount a {sys.argv[0]} filesystem (powered by TreeFuse)\n"
-        + Fuse.fusage
-    )
-    server = TreeFuseFS(
-        version="%prog " + fuse.__version__,
-        usage=usage,
-        dash_s_do="setsingle",
-        tree=tree,
-    )
-
-    server.parse(errex=1)
-    server.main()
+    provider = TreelibProvider(tree)
+    _treefuse_main(provider)
