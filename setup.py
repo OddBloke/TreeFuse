@@ -20,7 +20,7 @@ test_requirements = ['pytest>=3', ]
 setup(
     author="Daniel Watkins",
     author_email='daniel@daniel-watkins.co.uk',
-    python_requires='>=3.6',
+    python_requires='>=3.7',
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',
         'Intended Audience :: Developers',
