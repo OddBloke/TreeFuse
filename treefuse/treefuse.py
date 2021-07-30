@@ -141,6 +141,7 @@ class TreeFuseNode:
 
 
 class TreeFuseProvider(ABC):
+    # XXX: method docs
 
     @abstractmethod
     def children_for(self, path: str) -> Collection[TreeFuseNode]:
@@ -156,6 +157,7 @@ class TreeFuseProvider(ABC):
 
 
 class TreelibProvider(TreeFuseProvider):
+    # XXX: method docs
     def __init__(self, tree: treelib.Tree):
         self._tree = tree
 
