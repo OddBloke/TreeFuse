@@ -2,8 +2,8 @@
 History
 =======
 
-Next
-----
+1.1.0 (2021-07-30)
+------------------
 
 * Substantial refactor to introduce the internal infrastructure for non-treelib
   ``TreeFuseProvider`` classes.
