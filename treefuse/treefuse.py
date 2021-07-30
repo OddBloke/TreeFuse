@@ -165,15 +165,17 @@ class TreeFuseProvider(ABC):
         """
         pass
 
-    @abstractmethod
     def is_directory(self, path: str) -> bool:
         """Is ``path`` a directory?
 
         This will only be called for paths for which ``lookup_path`` returns a
         ``TreeFuseNode`` without a ``.stat`` set, to determine the appropriate
         default to use.
+
+        A default implementation is provided, which checks that
+        ``self.children_for`` is not empty.
         """
-        pass
+        return bool(self.children_for(path))
 
     @abstractmethod
     def lookup_path(self, path: str) -> Optional[TreeFuseNode]:
@@ -207,9 +209,6 @@ class TreelibProvider(TreeFuseProvider):
                 self._treelib_node_to_treefusenode(treelib_child_node)
             )
         return children
-
-    def is_directory(self, path: str) -> bool:
-        return len(self.children_for(path)) != 0
 
     def _lookup_path(self, path: str) -> Optional[treelib.Node]:
         """Look up the given ``path`` in our ``treelib.Tree``.
