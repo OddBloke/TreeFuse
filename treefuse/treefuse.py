@@ -125,6 +125,19 @@ class TreeFuseStat(fuse.Stat):
 
 @dataclass(frozen=True)
 class TreeFuseNode:
+    """An abstraction of a node in a TreeFuse filesystem.
+
+    :param name:
+        The name of the node in the filesystem (i.e. filename/directory name).
+    :param _content:
+        The content of the node in the filesystem, if any.  Files will default
+        to b"" as their content if ``None`` is specified.  (This can be passed
+        for directories, but won't be used by TreeFuse.)
+    :param stat:
+        The ``TreeFuseStat`` that should be used for this node: if not given,
+        TreeFuse will use a default (with ``TreeFuseProvider.is_directory``
+        determining whether to use the file or directory default).
+    """
     name: str
     _content: Optional[bytes]
     stat: Optional[TreeFuseStat] = None
@@ -141,27 +154,52 @@ class TreeFuseNode:
 
 
 class TreeFuseProvider(ABC):
-    # XXX: method docs
+    """Abstract base class for TreeFuse providers."""
 
     @abstractmethod
     def children_for(self, path: str) -> Collection[TreeFuseNode]:
+        """Return ``TreeFuseNode``s for each child of ``path``.
+
+        N.B. TreeFuse does not (yet) support empty directories, so returning an
+        empty ``Collection`` is used to indicate that ``path`` is a file.
+        """
         pass
 
     @abstractmethod
     def is_directory(self, path: str) -> bool:
+        """Is ``path`` a directory?
+
+        This will only be called for paths for which ``lookup_path`` returns a
+        ``TreeFuseNode`` without a ``.stat`` set, to determine the appropriate
+        default to use.
+        """
         pass
 
     @abstractmethod
     def lookup_path(self, path: str) -> Optional[TreeFuseNode]:
+        """Return a ``TreeFuseNode`` corresponding to ``path``.
+
+        If the path is not present in the filesystem, return ``None``.
+        Otherwise return the ``TreeFuseNode`` corresponding to ``path``
+        """
         pass
 
 
 class TreelibProvider(TreeFuseProvider):
-    # XXX: method docs
+    """A ``TreeFuseProvider`` to wrap a ``treelib.Tree``.
+
+    :param tree:
+        The tree to use as the source of the FUSE filesystem.
+    """
     def __init__(self, tree: treelib.Tree):
         self._tree = tree
 
     def children_for(self, path: str) -> Collection[TreeFuseNode]:
+        """Return ``TreeFuseNode``\ s for each child of ``path``.
+
+        Specifically, we find the ``treelib.Node`` corresponding to ``path``,
+        and return a ``TreeFuseNode`` for each of its children in the tree.
+        """
         node = self._lookup_path(path)
         children = []
         for treelib_child_node in self._tree.children(node.identifier):
@@ -174,6 +212,11 @@ class TreelibProvider(TreeFuseProvider):
         return len(self.children_for(path)) != 0
 
     def _lookup_path(self, path: str) -> Optional[treelib.Node]:
+        """Look up the given ``path`` in our ``treelib.Tree``.
+
+        This is the internal lookup function: it operates only in terms of
+        treelib objects.
+        """
         path = path.lstrip(os.path.sep)
         lookups = path.split(os.path.sep) if path else []
 
@@ -192,7 +235,7 @@ class TreelibProvider(TreeFuseProvider):
         return current_node
 
     def lookup_path(self, path: str) -> Optional[TreeFuseNode]:
-        """Find the node in self._tree corresponding to the given `path`.
+        """Find the node in ``self._tree`` corresponding to the given ``path``.
 
         Returns None if the path isn't present."""
         maybe_treelib_node = self._lookup_path(path)
@@ -203,6 +246,11 @@ class TreelibProvider(TreeFuseProvider):
     def _treelib_node_to_treefusenode(
         self, node: treelib.Node
     ) -> TreeFuseNode:
+        """Construct a ``TreeFuseNode`` for the given ``treelib.Node``.
+
+        This consists of mapping ``node.data`` to ``TreeFuseNode.__init__``
+        parameters.
+        """
         if isinstance(node.data, tuple):
             # We have a (content, stat) tuple.
             treefuse_node = TreeFuseNode(node.tag, *node.data)
